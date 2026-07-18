@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>リアルタイム高周波スペクトル</title>
+  <!-- Outfit Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <!-- PeerJS WebRTC P2P Library -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script type="module" crossorigin src="./assets/index-CE_k5231.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-fLTWAllW.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">AuraSonic <span class="badge">HF Zoom</span></div>
+      <p class="subtitle">高周波（10 kHz - 20 kHz）拡大スペクトル</p>
+    </header>
+
+    <!-- Role Selector -->
+    <div class="role-selector">
+      <button id="btn-role-sender" class="role-btn active">📡 マイク送信側</button>
+      <button id="btn-role-viewer" class="role-btn">📱 手元受信側</button>
+    </div>
+
+    <!-- P2P Peer Connection Panel -->
+    <div class="card p2p-card">
+      <div id="panel-sender-info">
+        <span class="panel-label">手元の受信スマホに入力する4桁コード:</span>
+        <div id="val-room-id" class="room-id-display">----</div>
+      </div>
+      <div id="panel-viewer-input" class="hidden">
+        <span class="panel-label">送信スマホの4桁コードを入力してください:</span>
+        <div class="connection-form">
+          <input type="number" id="input-connect-id" placeholder="例: 1234" pattern="[0-9]*" inputmode="numeric">
+          <button id="btn-connect-peer" class="btn-connect">同期接続</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visualizer Canvas Card -->
+    <section class="card visualizer-card">
+      <div class="canvas-container">
+        <canvas id="visualizer-canvas"></canvas>
+      </div>
+      <div class="frequency-labels">
+        <span>10 kHz</span>
+        <span>12.5 kHz</span>
+        <span>15 kHz</span>
+        <span>17.5 kHz</span>
+        <span>20 kHz</span>
+      </div>
+      <div class="visualizer-footer">
+        <span id="sampling-rate-info">マイクの動作周波数: -- Hz</span>
+        <span class="warning-tip">※多くのスピーカーは15kHz以上を物理的に出力できません。またBluetoothマイクは高域が自動カットされます。</span>
+      </div>
+    </section>
+
+    <!-- Main Control Button -->
+    <div class="control-actions">
+      <button id="btn-toggle-listen" class="btn-start">
+        <span class="btn-icon">⚡</span> 測定開始 (マイク起動)
+      </button>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Bundle -->
+</body>
+</html>
