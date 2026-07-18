@@ -8,20 +8,14 @@ const btnToggleListen = document.getElementById('btn-toggle-listen');
 const canvas = document.getElementById('visualizer-canvas');
 const ctx = canvas.getContext('2d');
 
-// Role Switcher buttons
-const btnRoleSender = document.getElementById('btn-role-sender');
-const btnRoleViewer = document.getElementById('btn-role-viewer');
-
-// P2P UI Elements
-const panelSenderInfo = document.getElementById('panel-sender-info');
-const panelViewerInput = document.getElementById('panel-viewer-input');
-const valRoomId = document.getElementById('val-room-id');
-const inputConnectId = document.getElementById('input-connect-id');
-const btnConnectPeer = document.getElementById('btn-connect-peer');
+// Status banner elements
+const statusBanner = document.getElementById('connection-status-banner');
+const statusIcon = document.getElementById('status-icon');
+const statusText = document.getElementById('status-text');
 
 // State
 let isListening = false;
-let currentRole = 'sender'; // 'sender' | 'viewer'
+let currentRole = 'loading'; // 'sender' | 'viewer' | 'loading'
 let sendThrottleCount = 0;
 
 // PeerJS instances
@@ -30,95 +24,94 @@ let activeConnections = []; // For Sender: list of connected viewer channels
 let p2pConnection = null;   // For Viewer: connection to the sender
 
 // ==========================================
-// 1. PeerJS WebRTC P2P Sync
+// 1. PeerJS WebRTC P2P Sync & Auto-Negotiation
 // ==========================================
 
-// Initialize PeerJS for Sender
-function initSenderPeer(code = null) {
-  destroyPeer();
-
-  // Generate a random 4-digit code if not provided
-  if (!code) {
-    code = Math.floor(1000 + Math.random() * 9000);
+function updateStatus(role, message) {
+  statusBanner.className = 'status-banner';
+  if (role === 'sender') {
+    statusBanner.classList.add('status-sender');
+    statusIcon.textContent = '📡';
+    statusText.textContent = `送信モード: ${message}`;
+    btnToggleListen.style.display = 'block';
+    btnToggleListen.disabled = false;
+  } else if (role === 'viewer') {
+    statusBanner.classList.add('status-viewer');
+    statusIcon.textContent = '📱';
+    statusText.textContent = `受信モード: ${message}`;
+    btnToggleListen.style.display = 'none'; // Viewers don't need mic button
+  } else {
+    statusBanner.classList.add('status-loading');
+    statusIcon.textContent = '🔄';
+    statusText.textContent = message;
+    btnToggleListen.style.display = 'none';
   }
-  
-  valRoomId.textContent = code;
-  const peerId = `aurasonic-${code}`;
+}
 
-  // Connect to the free public PeerJS cloud signaling server
-  peer = new Peer(peerId);
+// Auto-negotiate role: Try to be the master sender
+function autoNegotiateRole() {
+  destroyPeer();
+  updateStatus('loading', '役割を判定中...');
+
+  const masterId = 'aurasonic-master-sender';
+  
+  // Try to register as the master sender
+  peer = new Peer(masterId);
 
   peer.on('open', (id) => {
-    console.log('送信機のP2Pホストを開始しました:', id);
-    const rateInfo = document.getElementById('sampling-rate-info');
-    if (rateInfo) rateInfo.textContent = 'マイク送信機: P2P待機中...';
-  });
-
-  peer.on('connection', (conn) => {
-    console.log('受信機が接続しました:', conn.peer);
+    // Succeeded! This device is the sender (only one device can open this ID)
+    currentRole = 'sender';
+    console.log('送信機として登録されました:', id);
+    updateStatus('sender', 'スピーカー横に設置してください (マイク待機中)');
     
-    // Add to active connections
-    activeConnections.push(conn);
-    
-    const rateInfo = document.getElementById('sampling-rate-info');
-    if (rateInfo) rateInfo.textContent = `送信中 (接続済み受信機: ${activeConnections.length}台)`;
+    // Listen for incoming viewer connections
+    peer.on('connection', (conn) => {
+      console.log('受信機が接続しました:', conn.peer);
+      activeConnections.push(conn);
+      updateStatus('sender', `同期中 (受信機: ${activeConnections.length}台接続中)`);
 
-    conn.on('close', () => {
-      activeConnections = activeConnections.filter(c => c !== conn);
-      if (rateInfo) {
-        rateInfo.textContent = activeConnections.length > 0 
-          ? `送信中 (接続済み受信機: ${activeConnections.length}台)` 
-          : 'マイク送信機: P2P待機中...';
-      }
+      conn.on('close', () => {
+        activeConnections = activeConnections.filter(c => c !== conn);
+        updateStatus('sender', activeConnections.length > 0 
+          ? `同期中 (受信機: ${activeConnections.length}台接続中)` 
+          : 'スピーカー横に設置してください (マイク待機中)'
+        );
+      });
     });
   });
 
   peer.on('error', (err) => {
     if (err.type === 'unavailable-id') {
-      // 4-digit code is already taken globally on PeerJS cloud, retry with another code
-      console.warn('IDが既に使用されています。新しいコードで再試行します。');
-      const newCode = Math.floor(1000 + Math.random() * 9000);
-      initSenderPeer(newCode);
+      // The ID is already taken. Therefore, this device must be a Viewer!
+      console.log('他の端末が既に送信機として登録されています。受信機モードを開始します。');
+      startViewerMode();
     } else {
-      console.error('PeerJS 送信エラー:', err);
+      console.error('PeerJS 接続エラー:', err);
+      updateStatus('loading', '接続エラー。再試行中...');
+      setTimeout(autoNegotiateRole, 3000);
     }
   });
 }
 
-// Initialize PeerJS for Viewer and connect to Sender
-function connectToSender(targetCode) {
+// Initialize Viewer mode and connect to Master Sender
+function startViewerMode() {
   destroyPeer();
+  currentRole = 'viewer';
+  updateStatus('viewer', '送信機を探しています...');
 
-  if (!targetCode || targetCode.length !== 4) {
-    alert('4桁の数値を入力してください。');
-    return;
-  }
-
-  btnConnectPeer.disabled = true;
-  btnConnectPeer.textContent = '接続中...';
-  
-  // Initialize viewer peer with a random ID
+  // Start viewer with a random peer ID
   peer = new Peer();
 
   peer.on('open', (id) => {
-    console.log('受信機のP2Pを起動しました:', id);
-    const targetPeerId = `aurasonic-${targetCode}`;
+    console.log('受信機が起動しました:', id);
+    const masterId = 'aurasonic-master-sender';
     
-    // Connect to the sender
-    p2pConnection = peer.connect(targetPeerId);
+    // Connect to the master sender
+    p2pConnection = peer.connect(masterId);
 
     p2pConnection.on('open', () => {
-      console.log('送信機との同期接続に成功しました！');
-      btnConnectPeer.disabled = false;
-      btnConnectPeer.textContent = '同期完了';
-      btnConnectPeer.style.background = 'linear-gradient(135deg, #0072ff 0%, #00c6ff 100%)';
-      
-      btnToggleListen.innerHTML = '<span class="btn-icon">📶</span> データ受信中 (同期完了)';
-      btnToggleListen.className = 'btn-start listening';
-      btnToggleListen.disabled = true;
-      
-      const rateInfo = document.getElementById('sampling-rate-info');
-      if (rateInfo) rateInfo.textContent = '手元受信モード: 送信機と同期中';
+      console.log('送信機との同期に成功しました！');
+      updateStatus('viewer', '同期完了 (リアルタイム受信中)');
     });
 
     p2pConnection.on('data', (payload) => {
@@ -132,36 +125,22 @@ function connectToSender(targetCode) {
     });
 
     p2pConnection.on('close', () => {
-      console.warn('送信機との接続が切れました。');
-      handleViewerDisconnect();
+      console.warn('送信機との同期が切れました。再接続します。');
+      updateStatus('viewer', '送信機との接続が切れました。再起動中...');
+      setTimeout(startViewerMode, 2000);
     });
-    
+
     p2pConnection.on('error', (err) => {
       console.error('P2P接続エラー:', err);
-      handleViewerDisconnect();
+      setTimeout(startViewerMode, 2000);
     });
   });
 
   peer.on('error', (err) => {
     console.error('PeerJS 受信エラー:', err);
-    alert('送信機の接続コードが見つかりません。番号が正しいか確認してください。');
-    handleViewerDisconnect();
+    // If the sender is not active, keep looking for it
+    setTimeout(startViewerMode, 3000);
   });
-}
-
-function handleViewerDisconnect() {
-  btnConnectPeer.disabled = false;
-  btnConnectPeer.textContent = '同期接続';
-  btnConnectPeer.style.background = '';
-  
-  btnToggleListen.innerHTML = '<span class="btn-icon">⚡</span> 接続待機中';
-  btnToggleListen.className = 'btn-start';
-  btnToggleListen.disabled = true;
-  
-  const rateInfo = document.getElementById('sampling-rate-info');
-  if (rateInfo) rateInfo.textContent = '手元受信モード: 切断されました。再接続してください。';
-  
-  destroyPeer();
 }
 
 function destroyPeer() {
@@ -343,7 +322,6 @@ analyzer.onProgress = (dataArray, sampleRate) => {
   // Streaming: If there are active viewer connections, broadcast the FFT slice
   if (currentRole === 'sender' && activeConnections.length > 0) {
     sendThrottleCount++;
-    // Throttle to ~30fps (every 2 frames) to save mobile device resources
     if (sendThrottleCount % 2 === 0) {
       const totalBins = dataArray.length;
       const binWidth = (sampleRate / 2) / totalBins;
@@ -380,12 +358,12 @@ async function toggleListening() {
     btnToggleListen.classList.remove('listening');
     analyzer.stop();
     if (rateInfo) {
-      rateInfo.textContent = 'マイク送信機: P2P待機中...';
+      rateInfo.textContent = 'マイク送信機: 待機中...';
     }
   } else {
     try {
       btnToggleListen.disabled = true;
-      btnToggleListen.textContent = '接続中...';
+      btnToggleListen.textContent = '起動中...';
       
       await analyzer.startMicrophone();
       
@@ -413,75 +391,7 @@ async function toggleListening() {
 btnToggleListen.addEventListener('click', toggleListening);
 
 // ==========================================
-// 4. Role Selector Event Handlers
+// 4. Bootstrap App
 // ==========================================
-
-btnRoleSender.addEventListener('click', () => {
-  if (currentRole === 'sender') return;
-  
-  currentRole = 'sender';
-  btnRoleSender.classList.add('active');
-  btnRoleViewer.classList.remove('active');
-  
-  panelSenderInfo.classList.remove('hidden');
-  panelViewerInput.classList.add('hidden');
-  
-  // Reset P2P connections
-  destroyPeer();
-  ctx.clearRect(0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
-  
-  // Show standard sender controls
-  btnToggleListen.disabled = false;
-  btnToggleListen.innerHTML = '<span class="btn-icon">⚡</span> 測定開始 (マイク起動)';
-  btnToggleListen.className = 'btn-start';
-  
-  const rateInfo = document.getElementById('sampling-rate-info');
-  if (rateInfo) rateInfo.textContent = 'マイク送信機: P2P待機中...';
-  
-  // Startup P2P Sender
-  initSenderPeer();
-});
-
-btnRoleViewer.addEventListener('click', () => {
-  if (currentRole === 'viewer') return;
-  
-  currentRole = 'viewer';
-  btnRoleViewer.classList.add('active');
-  btnRoleSender.classList.remove('active');
-  
-  panelSenderInfo.classList.add('hidden');
-  panelViewerInput.classList.remove('hidden');
-  
-  // Stop mic if it was listening
-  if (isListening) {
-    isListening = false;
-    analyzer.stop();
-  }
-  
-  destroyPeer();
-  ctx.clearRect(0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
-  
-  // Update control button to show sync mode
-  btnToggleListen.disabled = true;
-  btnToggleListen.innerHTML = '<span class="btn-icon">⚡</span> 接続コード入力待ち';
-  btnToggleListen.className = 'btn-start';
-  
-  const rateInfo = document.getElementById('sampling-rate-info');
-  if (rateInfo) rateInfo.textContent = '手元受信モード: コードを入力して接続ボタンを押してください。';
-});
-
-// Bind Connect Button (Viewer)
-btnConnectPeer.addEventListener('click', () => {
-  const code = inputConnectId.value.trim();
-  if (code.length === 4) {
-    connectToSender(code);
-  } else {
-    alert('送信機画面に表示されている4桁の数字を入力してください。');
-  }
-});
-
-// ==========================================
-// 5. Bootstrap App
-// ==========================================
-// Auto init sender peer on startup
-initSenderPeer();
+// Auto-start role negotiation
+autoNegotiateRole();

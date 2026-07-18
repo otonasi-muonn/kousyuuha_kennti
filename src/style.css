@@ -207,74 +207,36 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* P2P Connection Card Styling */
-.p2p-card {
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  text-align: center;
-  border-color: rgba(0, 240, 255, 0.2);
-}
-
-.panel-label {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-.room-id-display {
-  font-size: 2.2rem;
-  font-weight: 800;
-  color: var(--color-accent);
-  letter-spacing: 4px;
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
-  font-family: monospace;
-}
-
-.connection-form {
+/* Connection Status Banner */
+.status-banner {
   display: flex;
-  gap: 0.5rem;
-  justify-content: center;
   align-items: center;
-}
-
-#input-connect-id {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-color);
-  color: #fff;
-  font-size: 1.2rem;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 10px;
+  border-radius: 12px;
   font-weight: 700;
-  text-align: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  width: 120px;
-  outline: none;
-  font-family: monospace;
-}
-
-#input-connect-id:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
-}
-
-.btn-connect {
-  background: linear-gradient(135deg, #00ff66 0%, #00aa50 100%);
-  border: none;
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.95rem;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: var(--font-main);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all var(--transition-fast);
 }
 
-.btn-connect:hover {
-  filter: brightness(1.1);
+.status-loading {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-muted);
 }
 
-.btn-connect:active {
-  transform: scale(0.96);
+.status-sender {
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--color-accent);
+  border-color: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+}
+
+.status-viewer {
+  background: rgba(0, 255, 102, 0.1);
+  color: #00ff66;
+  border-color: rgba(0, 255, 102, 0.2);
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.1);
 }
